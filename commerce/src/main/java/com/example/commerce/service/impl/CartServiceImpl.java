@@ -12,6 +12,7 @@ import com.example.commerce.dto.CartResponseDto;
 import com.example.commerce.entity.Cart;
 import com.example.commerce.entity.CartItem;
 import com.example.commerce.entity.Product;
+import com.example.commerce.exception.OutOfStockException;
 import com.example.commerce.mapper.CartMapper;
 import com.example.commerce.repository.CartRepository;
 import com.example.commerce.repository.ProductRepository;
@@ -69,6 +70,10 @@ public class CartServiceImpl implements CartService {
 	@Override
 	@CachePut(value = "carts", key = "#userId")
 	public CartResponseDto addItem(Long userId, Long productId, int quantity) {
+		if (quantity < 0) {
+			throw new IllegalArgumentException("Invalid Quantity");
+		}
+		
 		Cart cart = cartRepository.findByUserIdAndActiveTrue(userId)
 				.orElseThrow(() -> new IllegalArgumentException("Cart not found"));
 	
@@ -80,8 +85,14 @@ public class CartServiceImpl implements CartService {
 				.findFirst()
 				.orElse(null);
 		
+		boolean hasStock = true;
 		if (existingItem != null) {
 			existingItem.setQuantity(existingItem.getQuantity() + quantity);
+			
+			// Check for stock availability
+			if (existingItem.getQuantity() > product.getStockQuantity()) {
+				hasStock = false;
+			}
 		} else {
 			CartItem item = new CartItem();
 			item.setCart(cart);
@@ -89,6 +100,15 @@ public class CartServiceImpl implements CartService {
 			item.setQuantity(quantity);
 			
 			cart.getItems().add(item);
+			
+			// Check for stock availability
+			if (item.getQuantity() > product.getStockQuantity()) {
+				hasStock = false;
+			}
+		}
+		
+		if (!hasStock) {
+			throw new OutOfStockException("Not enough stock for product: " + product.getName());
 		}
 		
 		cartRepository.save(cart);
@@ -102,6 +122,9 @@ public class CartServiceImpl implements CartService {
 		Cart cart = cartRepository.findByUserIdAndActiveTrue(userId)
 				.orElseThrow(() -> new IllegalArgumentException("Cart not found"));
 		
+		Product product = productRepository.findById(productId)
+				.orElseThrow(() -> new IllegalArgumentException("Product not found"));
+		
 		CartItem existingItem = cart.getItems().stream()
 				.filter(i -> i.getProduct().getId().equals(productId))
 				.findFirst()
@@ -111,6 +134,10 @@ public class CartServiceImpl implements CartService {
 			cart.getItems().remove(existingItem);
 		} else {
 			existingItem.setQuantity(quantity);
+		}
+		
+		if (existingItem.getQuantity() > product.getStockQuantity()) {
+			throw new OutOfStockException("Not enough stock for product: " + product.getName());
 		}
 		
 		cartRepository.save(cart);

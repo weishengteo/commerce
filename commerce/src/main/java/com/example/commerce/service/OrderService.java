@@ -9,6 +9,8 @@ public interface OrderService {
 	
 	public OrderResponseDto createOrder(Long userId);
 	
+	public OrderResponseDto processPayment(Long orderId);
+	
 	public OrderResponseDto getOrderById(Long id);
 	
 	public List<OrderResponseDto> getUserOrders(Long userId);

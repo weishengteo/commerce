@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Data;
 
 @Data
@@ -25,4 +26,7 @@ public class Product {
 	private BigDecimal price;
 	
 	private int stockQuantity;
+	
+	@Version
+    private Long version;
 }

@@ -12,9 +12,12 @@ import com.example.commerce.entity.Cart;
 import com.example.commerce.entity.Order;
 import com.example.commerce.entity.OrderItem;
 import com.example.commerce.entity.OrderStatus;
+import com.example.commerce.entity.Product;
+import com.example.commerce.exception.OutOfStockException;
 import com.example.commerce.mapper.OrderMapper;
 import com.example.commerce.repository.CartRepository;
 import com.example.commerce.repository.OrderRepository;
+import com.example.commerce.repository.ProductRepository;
 import com.example.commerce.service.OrderService;
 import com.example.commerce.util.OrderStatusHelper;
 
@@ -28,6 +31,7 @@ public class OrderServiceImpl implements OrderService {
 	
 	private final OrderRepository orderRepository;
 	private final CartRepository cartRepository;
+	private final ProductRepository productRepository;
 
 	@Override
 	public OrderResponseDto createOrder(Long userId) {
@@ -48,6 +52,10 @@ public class OrderServiceImpl implements OrderService {
 		order.setStatus(OrderStatus.PENDING);
 		
 		List<OrderItem> items = cart.getItems().stream().map(cartItem -> {
+			if (cartItem.getProduct().getStockQuantity() < cartItem.getQuantity()) {
+				throw new OutOfStockException("Not enough stock for product: " + cartItem.getProduct().getName());
+			}
+			
 			OrderItem item = new OrderItem();
 			item.setProduct(cartItem.getProduct());
 			item.setOrder(order);
@@ -70,6 +78,26 @@ public class OrderServiceImpl implements OrderService {
 		cartRepository.save(cart);
 		
 		return OrderMapper.toDto(order);
+	}
+
+	@Override
+	public OrderResponseDto processPayment(Long orderId) {
+		Order order = orderRepository.findById(orderId)
+				.orElseThrow(() -> new IllegalArgumentException("Order not found"));
+		
+		// Check and deduct stock
+		for (OrderItem item : order.getItems()) {
+	        Product product = item.getProduct();
+	        if (product.getStockQuantity() < item.getQuantity()) {
+	            throw new OutOfStockException("Not enough stock for product: " + product.getName());
+	        }
+	        // Deduct stock
+	        product.setStockQuantity(product.getStockQuantity() - item.getQuantity());
+	        productRepository.save(product);
+	    }
+		
+		order.setStatus(OrderStatus.PAID);
+		return OrderMapper.toDto(orderRepository.save(order));
 	}
 
 	@Override

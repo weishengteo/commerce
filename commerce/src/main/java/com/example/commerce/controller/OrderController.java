@@ -30,6 +30,12 @@ public class OrderController {
 		return ResponseEntity.ok(order);
 	}
 	
+	@PostMapping("/pay")
+	public ResponseEntity<OrderResponseDto> processPayment(@RequestBody OrderDto request) {
+		OrderResponseDto order = orderService.processPayment(request.getOrderId());
+		return ResponseEntity.ok(order);
+	}
+	
 	@GetMapping("/{id}")
 	public ResponseEntity<OrderResponseDto> getOrderById(@PathVariable Long id) {
 		OrderResponseDto order = orderService.getOrderById(id);
