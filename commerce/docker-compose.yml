@@ -22,12 +22,36 @@ services:
     depends_on:
       - db
       - redis
+      - kafka
+      - zookeeper
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/demo
       SPRING_DATASOURCE_USERNAME: demo
       SPRING_DATASOURCE_PASSWORD: demo
       SPRING_REDIS_HOST: redis
       SPRING_REDIS_PORT: 6379
+
+  zookeeper:
+    image: public.ecr.aws/bitnami/zookeeper:3.9.3
+    container_name: zookeeper
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: public.ecr.aws/bitnami/kafka:3.9.0
+    container_name: kafka
+    environment:
+      - KAFKA_BROKER_ID=1
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9093
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9093
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports:
+      - "9093:9093"
+    depends_on:
+      - zookeeper
 
 volumes:
   db_data:

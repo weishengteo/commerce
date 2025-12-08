@@ -5,8 +5,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import com.example.commerce.config.KafkaEmailPublisher;
+import com.example.commerce.dto.EmailDto;
 import com.example.commerce.dto.OrderResponseDto;
 import com.example.commerce.entity.Cart;
 import com.example.commerce.entity.Order;
@@ -29,9 +33,12 @@ import lombok.RequiredArgsConstructor;
 @Service
 public class OrderServiceImpl implements OrderService {
 	
+	private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
+	
 	private final OrderRepository orderRepository;
 	private final CartRepository cartRepository;
 	private final ProductRepository productRepository;
+	private final KafkaEmailPublisher emailPublisher;
 
 	@Override
 	public OrderResponseDto createOrder(Long userId) {
@@ -82,8 +89,14 @@ public class OrderServiceImpl implements OrderService {
 
 	@Override
 	public OrderResponseDto processPayment(Long orderId) {
+		logger.info("Start processing payment: " + orderId );
+		
 		Order order = orderRepository.findById(orderId)
 				.orElseThrow(() -> new IllegalArgumentException("Order not found"));
+		
+		if (order.getStatus() != OrderStatus.PENDING) {
+			throw new IllegalArgumentException("Cannot process payment for order status: " + order.getStatus());
+		}
 		
 		// Check and deduct stock
 		for (OrderItem item : order.getItems()) {
@@ -97,7 +110,25 @@ public class OrderServiceImpl implements OrderService {
 	    }
 		
 		order.setStatus(OrderStatus.PAID);
-		return OrderMapper.toDto(orderRepository.save(order));
+		
+		orderRepository.save(order);
+		
+		// Send email using KafkaMQ 
+        EmailDto email = new EmailDto();
+        email.setFrom("no-reply@myshop.com");
+        email.setTo(order.getUser().getEmail());
+        email.setSubject("Your order #" + order.getId() + " has been paid");
+        
+        StringBuilder body = new StringBuilder("Thank you for your purchase! Order details:\n");
+        for (OrderItem item : order.getItems()) {
+            body.append("- ").append(item.getProduct().getName())
+                .append(" x").append(item.getQuantity()).append("\n");
+        }
+        email.setBody(body.toString());
+        logger.info("Sending email");
+        emailPublisher.sendEmailEvent(email);
+        
+		return OrderMapper.toDto(order);
 	}
 
 	@Override

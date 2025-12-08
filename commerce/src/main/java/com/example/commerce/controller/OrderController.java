@@ -36,6 +36,12 @@ public class OrderController {
 		return ResponseEntity.ok(order);
 	}
 	
+	@PutMapping("/{id}")
+	public ResponseEntity<Void> updateOrderStatus(@RequestBody OrderDto request) {
+		orderService.updateOrderStatus(request.getOrderId(), request.getStatus());
+		return ResponseEntity.noContent().build();
+	}
+	
 	@GetMapping("/{id}")
 	public ResponseEntity<OrderResponseDto> getOrderById(@PathVariable Long id) {
 		OrderResponseDto order = orderService.getOrderById(id);
@@ -43,15 +49,9 @@ public class OrderController {
 	}
 	
 	@PostMapping("/user")
-	public ResponseEntity<List<OrderResponseDto>> getUserOrders(@RequestBody Long userId) {
-		List<OrderResponseDto> order = orderService.getUserOrders(userId);
+	public ResponseEntity<List<OrderResponseDto>> getUserOrders(@RequestBody OrderDto request) {
+		List<OrderResponseDto> order = orderService.getUserOrders(request.getUserId());
 		return ResponseEntity.ok(order);
-	}
-	
-	@PutMapping("/{id}")
-	public ResponseEntity<Void> updateOrderStatus(@RequestBody OrderDto request) {
-		orderService.updateOrderStatus(request.getOrderId(), request.getStatus());
-		return ResponseEntity.noContent().build();
 	}
 	
 }
